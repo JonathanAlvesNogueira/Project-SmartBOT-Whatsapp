@@ -1,0 +1,29 @@
+# Segredos e configuracoes locais
+.env
+.env.*
+!.env.example
+
+# Ambiente Python e arquivos compilados
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Dados e caches gerados em execucao
+chroma_db/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Streamlit local
+.streamlit/secrets.toml
+
+# Sistema e editor
+.DS_Store
+Thumbs.db
+.vscode/
