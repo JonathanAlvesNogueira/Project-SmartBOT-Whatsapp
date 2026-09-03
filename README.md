@@ -2,7 +2,7 @@
 
 Chatbot inteligente para WhatsApp usando **LLM + RAG + (futuro) Análise de Sentimentos**, desenvolvido como trabalho de extensão do curso de **Ciência de Dados**. O contexto é uma academia fictícia (**FitLife Academia**) para demonstrar o produto em um cenário corporativo real.
 
-> **Status atual:** MVP do RAG (Sprint 4) — busca vetorial funcionando e aprovada. Camadas de LLM, sentimento, priorização e WhatsApp são sprints futuros.
+> **Status atual:** MVP do RAG (Sprint 4) + **camada de LLM local (Sprint 5)** — busca vetorial aprovada (5/5) e respostas personalizadas por sentimento via **Llama 3.2 1B** (offline, gratuito). Priorização e integração com WhatsApp são sprints futuros.
 
 ---
 
@@ -23,7 +23,8 @@ Criar um agente capaz de:
 
 ```
 Cliente envia pergunta → vira embedding → busca vetorial no ChromaDB
-        → recupera os melhores chunks → (futuro) LLM responde com esse contexto
+        → recupera os melhores chunks → Llama (LLM local) gera a resposta
+        → o Llama percebe o sentimento e ajusta o tom (empático/neutro/etc.)
 ```
 
 ## 📁 Estrutura do projeto
@@ -39,6 +40,9 @@ smart-whatsapp-agent/
 │   ├── chroma_manager.py           # Conexão com o ChromaDB (coleção "fitlife")
 │   ├── indexer.py                  # Indexa os 52 chunks no ChromaDB
 │   └── retriever.py                # Busca vetorial Top-K (buscar)
+│
+├── llm/
+│   └── responder.py                # RAG + Llama: sentimento + resposta personalizada
 │
 ├── tests/
 │   └── test_5_questoes.py          # Teste de aceite (5 perguntas obrigatórias)
@@ -56,21 +60,22 @@ smart-whatsapp-agent/
 
 ---
 
-## ✅ O que já funciona (MVP do RAG)
+## ✅ O que já funciona (MVP do RAG + LLM local)
 
 - [x] Validar `fitlife_knowledge.json` (52 chunks, sem duplicados);
 - [x] Gerar **embeddings neurais locais** (offline, sem custo, sem API);
 - [x] Indexar os 52 chunks no **ChromaDB**;
 - [x] Buscar **Top-K por similaridade de cosseno**;
 - [x] **Retrieval Inspector** em Streamlit (auditoria do RAG);
-- [x] **Teste de aceite 5/5** no Top-3.
+- [x] **Teste de aceite 5/5** no Top-3;
+- [x] **LLM local (Llama 3.2 1B)**: gera resposta a partir do chunk recuperado;
+- [x] **Análise de sentimento implícita**: o próprio Llama percebe o tom do cliente
+      e ajusta a resposta (empático, neutro, etc.) — sem biblioteca separada.
 
 ## 🔜 Próximos sprints (futuro)
 
-- [ ] Camada de **LLM** (montar prompt e gerar resposta a partir do contexto);
-- [ ] **Análise de sentimentos** e adaptação de tom;
 - [ ] Priorização de atendimentos críticos;
-- [ ] Registro de conversas e métricas;
+- [ ] Registro de conversas e métricas (indicadores);
 - [ ] Integração com **WhatsApp**.
 
 ---
@@ -132,6 +137,25 @@ Digite uma pergunta e veja quais chunks foram recuperados, a similaridade, a cat
 
 Abra `teste_rag.ipynb` e use as células para testar frases livremente.
 
+### 7. Gerar resposta com o LLM local (Llama 3.2 1B)
+
+```bash
+python -m llm.responder
+```
+
+A primeira execução baixa o modelo (≈2,5 GB) da Hugging Face. Depois disso é
+**100% offline e gratuito**. Escreva o uso no código para customizar a pergunta:
+
+```python
+from llm.responder import responder
+resposta = responder("Quero cancelar meu plano AGORA!")   # demora ~15-30s na CPU
+```
+
+> ⚠️ **Sobre a velocidade:** na CPU (sem GPU) cada resposta leva ~15–30 s — aceitável
+> para demonstração acadêmica, não para um chat em tempo real. Uma GPU permitiria
+> respostas em poucos segundos. O modelo usado é o Llama 3.2 **1B** (quantizado),
+> o que o mantém leve e viável para portfólio/demo.
+
 ---
 
 ## 🧪 Perguntas de exemplo
@@ -162,6 +186,79 @@ O projeto usa embeddings **neurais locais** com `sentence-transformers` (`paraph
 - Qualidade semântica superior ao TF-IDF.
 
 Para a busca, cada chunk é indexado com **título + categoria + tags + conteúdo**, o que melhora a recuperação de termos que não aparecem no corpo do texto (ex.: "funcional" é uma tag).
+
+## 🤖 Sobre o LLM (decisão de arquitetura — Sprint 5)
+
+A resposta final é gerada pelo **Llama 3.2 1B Instruct** (via HuggingFace/`transformers`),
+escolhido em vez da API da OpenAI pelos mesmos motivos do RAG: **gratuito, offline** e sem
+expor dados de clientes. Usamos a versão pública do **Unsloth** (não exige aceite de
+licença da Meta nem token).
+
+**Por que não usar uma biblioteca separada de análise de sentimentos?**
+O próprio Llama, ao receber o prompt com o contexto do RAG + a mensagem do cliente,
+**identifica o sentimento no texto** (irritado, ansioso, neutro, feliz...) e já gera a
+resposta **no tom adequado**. Isso simplifica o código, reduz dependências e é mais
+fácil de explicar no trabalho ("o LLM entende o contexto e a emoção"). Exemplos medidos:
+
+| Entrada | Comportamento |
+|---|---|
+| "Quanto custa o plano anual?" | Tom **neutro/objetivo**, com o dado do chunk (R$69/mês) |
+| "REVOLTADO! Vou processar vocês!" | Tom **empático/acolhedor**, sem confrontar |
+
+**Limitação conhecida:** a CPU gera ~15–30 s por resposta (modelo 1B em float32).
+É suficiente para demonstração; uma GPU tornaria o agente viável em tempo real.
+
+---
+
+## 🔑 Decisões de projeto que você não pode esquecer
+
+> ⚠️ Esta seção documenta duas decisões importantes para você **não se perder** ao
+> revisitar o código (ou apresentá-lo). Leia antes de mexer.
+
+### 1. O LLM é **stateless** — sem memória de conversa
+
+O Llama **não guarda nada** entre uma resposta e outra. Cada chamada a
+`responder()` é independente: ele "esquece" toda a conversa anterior, e o prompt
+é montado do zero a cada vez. O que **fica armazenado** é apenas a **base fixa de
+conhecimento** (os 52 chunks do JSON indexados no ChromaDB) — não a memória do
+diálogo.
+
+**Por que isso importa e como vira diferencial no futuro:**
+
+- Hoje, o agente trata cada mensagem isoladamente (adequado para demonstração).
+- Um **diferencial futuro/feature vendável**: adicionar **histórico de conversa**
+  (uma lista das mensagens trocadas que é passada junto no prompt), para o agente
+  responder com contexto do diálogo (`"como você disse antes..."`).
+- Implementar isso = manter as mensagens acumuladas e incluí-las no `montar_prompt()`,
+  respeitando o limite de contexto do modelo.
+
+### 2. `responder.py` **já integra RAG + LLM** (não são coisas separadas)
+
+RAG e LLM **não** são módulos desconectados. O `llm/responder.py` é exatamente a
+**integração** entre eles — uma única chamada `responder(pergunta)` executa o
+pipeline completo em sequência:
+
+```
+responder("pergunta")
+   ├─ 1° RAG : buscar() → embedding → ChromaDB → recupera o chunk (linha 46)
+   ├─ 2° montar_prompt() : junta chunk + instrução de tom (linha 84)
+   ├─ 3° _carregar() : carrega o Llama (linha 85)
+   └─ 4° model.generate() : gera a resposta (linha 94)
+```
+
+Para uso, basta chamar `responder()` — a integração já acontece por dentro.
+**Rode sempre da raiz do projeto** (`python -m llm.responder`), nunca de dentro
+da pasta `llm/`, para os imports (`from rag.retriever import`) continuarem valendo.
+
+**Duas bibliotecas distintas (evite confundir no relatório):**
+
+| Componente | Biblioteca | Papel |
+|---|---|---|
+| **RAG (busca)** | `sentence-transformers` | transforma texto em embeddings p/ a busca |
+| **LLM (resposta)** | `transformers` (Llama) | gera a resposta a partir do chunk |
+
+O RAG **não** usa o Llama para buscar, e o LLM **não** usa os embeddings para
+responder. São camadas conectadas pelo `responder.py`.
 
 ---
 

@@ -2,3 +2,8 @@ chromadb
 sentence-transformers
 python-dotenv
 streamlit
+
+# Camada de LLM local (Llama 3.2 via HuggingFace) - Sprint 5
+transformers
+accelerate
+huggingface-hub
