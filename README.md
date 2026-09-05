@@ -47,7 +47,8 @@ smart-whatsapp-agent/
 ├── tests/
 │   └── test_5_questoes.py          # Teste de aceite (5 perguntas obrigatórias)
 │
-├── inspector.py                    # Retrieval Inspector (Streamlit)
+├── inspector.py                    # Retrieval Inspector (Streamlit) — auditoria do RAG
+├── chat.py                         # Chat com o assistente (Streamlit) — RAG + Llama
 ├── teste_rag.ipynb                 # Notebook interativo para testar a busca
 │
 ├── Documentação Projeto.docx       # Documentação acadêmica
@@ -150,6 +151,16 @@ A primeira execução baixa o modelo (≈2,5 GB) da Hugging Face. Depois disso �
 from llm.responder import responder
 resposta = responder("Quero cancelar meu plano AGORA!")   # demora ~15-30s na CPU
 ```
+
+### 8. Abrir o Chat do assistente (Streamlit)
+
+```bash
+streamlit run chat.py
+```
+
+Interface de conversa no navegador: digite a pergunta, veja a resposta do
+Llama e marque **"Ver contexto RAG"** para inspecionar quais chunks embasaram
+a resposta (prova de funcionamento do pipeline).
 
 > ⚠️ **Sobre a velocidade:** na CPU (sem GPU) cada resposta leva ~15–30 s — aceitável
 > para demonstração acadêmica, não para um chat em tempo real. Uma GPU permitiria
