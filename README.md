@@ -273,3 +273,20 @@ responder. São camadas conectadas pelo `responder.py`.
 ## 👥 Autoria
 
 Projeto de extensão em **Ciência de Dados** — FitLife Academia (ambiente de demonstração).
+
+---
+
+## 📚 Referências
+
+Referências técnicas que fundamentam o projeto (usadas como **base de consulta**):
+
+- **HUYEN, Chip.** *Designing Machine Learning Systems: An Iterative Process for
+  Production-Ready Applications*. O'Reilly Media, 2022. — **Referência principal**
+  do projeto: fundamenta o pipeline de **RAG** (recuperação + geração), a busca
+  vetorial por embeddings, e as decisões de produção (custo, offline, qualidade).
+
+### Principais bibliotecas / tecnologias aplicadas
+- **sentence-transformers** — embeddings neurais locais (busca semântica no RAG);
+- **ChromaDB** — banco vetorial (indexação e consulta por similaridade de cosseno);
+- **transformers (Hugging Face)** — execução do LLM **Llama 3.2 1B** local;
+- **Streamlit** — interface do *Retrieval Inspector* (auditoria do RAG).
